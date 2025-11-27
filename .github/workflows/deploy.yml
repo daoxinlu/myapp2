@@ -25,6 +25,11 @@ jobs:
           VITE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: npm run build
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
