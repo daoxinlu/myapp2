@@ -107,10 +107,12 @@ const callGemini = async (prompt: string | any, model: string = "gemini-2.5-flas
         // so projects that don't install the package can still build and use fallback logic.
         let GoogleGenAI: any = null;
         try {
-            // Import from a CDN at runtime. Use `@vite-ignore` so Vite does not try
+            // Import from a CDN at runtime using string concatenation to avoid TypeScript
+            // compile-time resolution. Use `@vite-ignore` so Vite does not try
             // to resolve or pre-bundle this import during dev; the browser will
-            // load it directly from the CDN (esm.sh).
-            const mod = await import(/* @vite-ignore */ 'https://esm.sh/@google/genai');
+            // load it directly from the CDN (esm.sh) at runtime.
+            const cdnUrl = 'https://esm.sh/' + '@google/genai';
+            const mod = await import(/* @vite-ignore */ cdnUrl);
             GoogleGenAI = mod.GoogleGenAI || mod.default || mod;
         } catch (impErr) {
             console.warn('Could not import @google/genai module dynamically from CDN', impErr);
