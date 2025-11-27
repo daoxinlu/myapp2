@@ -1,0 +1,7 @@
+{
+  "name": "TravelPal1 AI",
+  "description": "An intelligent travel companion that identifies nearby landmarks and provides professional audio narration using Gemini AI.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
