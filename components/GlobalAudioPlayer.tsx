@@ -1,5 +1,6 @@
 import React from 'react';
 import { AudioState } from '../types';
+import { ensureAudioUnlockedNow } from '../utils/audioUtils';
 
 interface GlobalAudioPlayerProps {
     audioState: AudioState;
@@ -25,7 +26,7 @@ const GlobalAudioPlayer: React.FC<GlobalAudioPlayerProps> = ({ audioState, onTog
                     )}
                 </div>
 
-                <div className="flex-1 min-w-0" onClick={onTogglePlay}>
+                <div className="flex-1 min-w-0" onClick={onTogglePlay} onPointerDown={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); } catch (e){} }}>
                     <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
                         {audioState.isPaused ? "已暂停" : "正在讲解"}
                     </div>
@@ -37,6 +38,8 @@ const GlobalAudioPlayer: React.FC<GlobalAudioPlayerProps> = ({ audioState, onTog
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={(e) => { e.stopPropagation(); onTogglePlay(); }}
+                        onPointerDown={(e) => { e.stopPropagation(); try { ensureAudioUnlockedNow(); } catch (er){} }}
+                        onTouchStart={(e) => { e.stopPropagation(); try { ensureAudioUnlockedNow(); } catch (er){} }}
                         className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                     >
                         {audioState.isPlaying ? (
@@ -47,6 +50,8 @@ const GlobalAudioPlayer: React.FC<GlobalAudioPlayerProps> = ({ audioState, onTog
                     </button>
                     <button 
                         onClick={(e) => { e.stopPropagation(); onStop(); }}
+                        onPointerDown={(e) => { e.stopPropagation(); try { ensureAudioUnlockedNow(); } catch (er){} }}
+                        onTouchStart={(e) => { e.stopPropagation(); try { ensureAudioUnlockedNow(); } catch (er){} }}
                         className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
                     >
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg>

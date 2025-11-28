@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Landmark, AudioState, Review, User } from '../types';
 import { fetchSubAttractions } from '../services/geminiService';
-import { unlockAudioOnUserGesture } from '../utils/audioUtils';
+import { unlockAudioOnUserGesture, ensureAudioUnlockedNow } from '../utils/audioUtils';
 
 interface LandmarkDetailProps {
   landmark: Landmark;
@@ -53,7 +53,9 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
     const subSpots = landmark.subAttractions || [];
 
     const togglePlay = () => {
-        unlockAudioOnUserGesture();
+        // Try immediate unlock and fallback to the generic unlock helper
+        try { ensureAudioUnlockedNow(); } catch (e) {}
+        try { unlockAudioOnUserGesture(); } catch (e) {}
         onPlayGuide(landmark.name, landmark.id, landmark);
     };
 
@@ -91,7 +93,7 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
              <div className="mb-6">
                  <div className="mb-4 text-sm text-slate-500 dark:text-slate-400">快速操作</div>
                  <div className="flex gap-2 mb-4">
-                     <button onClick={togglePlay} className="flex-1 py-4 rounded-2xl font-bold text-lg bg-teal-600 text-white">{isPlayingMain ? '暂停讲解' : isPausedMain ? '继续讲解' : '开始讲解'}</button>
+                     <button onClick={togglePlay} onPointerDown={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} className="flex-1 py-4 rounded-2xl font-bold text-lg bg-teal-600 text-white">{isPlayingMain ? '暂停讲解' : isPausedMain ? '继续讲解' : '开始讲解'}</button>
                  </div>
              </div>
 

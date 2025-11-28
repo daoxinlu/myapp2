@@ -21,6 +21,32 @@ export function unlockAudioOnUserGesture(): void {
     }
   } catch (e) {}
 }
+
+/**
+ * Try to synchronously create/resume a shared AudioContext so mobile
+ * touch/pointer handlers that run synchronously can play audio immediately.
+ */
+export function ensureAudioUnlockedNow(): void {
+  try {
+    const w = window as any;
+    const AudioCtx = w.AudioContext || w.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!w.__APP_AUDIO_CONTEXT) {
+      try {
+        w.__APP_AUDIO_CONTEXT = new AudioCtx();
+      } catch (e) {
+        return;
+      }
+    }
+    const ctx: AudioContext = w.__APP_AUDIO_CONTEXT;
+    if (ctx && ctx.state === 'suspended') {
+      // Attempt to resume synchronously; browsers may still treat this as user gesture
+      ctx.resume().catch(() => {});
+    }
+  } catch (e) {
+    // ignore
+  }
+}
 /**
  * Decodes a base64 string into a Uint8Array.
  */

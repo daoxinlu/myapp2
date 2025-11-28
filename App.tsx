@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Coordinates, Landmark, AudioState, SubAttraction } from './types';
 import { findNearbyLandmarks, generateLandmarkAudio, identifyLandmarkFromMultimodal, fetchSubAttractions, searchLocation, searchLandmarks } from './services/geminiService';
-import { unlockAudioOnUserGesture } from './utils/audioUtils';
+import { unlockAudioOnUserGesture, ensureAudioUnlockedNow } from './utils/audioUtils';
 import Radar from './components/Radar';
 
 // --- Types ---
@@ -865,18 +865,20 @@ const HomeView: React.FC<HomeViewProps> = ({
                              className="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 text-sm focus:ring-2 ring-teal-500 outline-none dark:text-white" 
                              placeholder="输入问题 (例如: 这个塔多高?)"
                          />
-                         <button className="absolute right-2 top-2 p-1.5 bg-teal-500 rounded-lg text-white" onClick={handleIdentify}>
+                         <button className="absolute right-2 top-2 p-1.5 bg-teal-500 rounded-lg text-white" onClick={handleIdentify} onPointerDown={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); } catch (e){} }}>
                              <SendIcon />
                          </button>
                      </div>
                      
-                     <button 
-                       onClick={handleIdentify} 
-                       disabled={scanning}
-                       className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-teal-200 dark:shadow-none active:scale-95 transition-transform"
-                     >
-                       {scanning ? "分析中..." : "开始识别并讲解"}
-                     </button>
+                                         <button 
+                                             onClick={handleIdentify} 
+                                             onPointerDown={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                                             onTouchStart={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                                             disabled={scanning}
+                                             className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-teal-200 dark:shadow-none active:scale-95 transition-transform"
+                                         >
+                                             {scanning ? "分析中..." : "开始识别并讲解"}
+                                         </button>
                  </div>
              </div>
           </div>
