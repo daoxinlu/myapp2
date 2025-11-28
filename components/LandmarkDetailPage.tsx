@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Landmark, AudioState, Review, User } from '../types';
 import { fetchSubAttractions } from '../services/geminiService';
-import { unlockAudioOnUserGesture, ensureAudioUnlockedNow } from '../utils/audioUtils';
+import { unlockAudioOnUserGesture, ensureAudioUnlockedNow, primeSpeechSynthesisNow, playSilentAudioNow } from '../utils/audioUtils';
+// Use native button to allow pointer/touch handlers without typing conflicts
 
 interface LandmarkDetailProps {
   landmark: Landmark;
@@ -56,8 +57,26 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
         // Try immediate unlock and fallback to the generic unlock helper
         try { ensureAudioUnlockedNow(); } catch (e) {}
         try { unlockAudioOnUserGesture(); } catch (e) {}
+        try { primeSpeechSynthesisNow(); } catch (e) {}
+        try { playSilentAudioNow(); } catch (e) {}
+        try {
+            // Provide an immediate audible feedback inside the user gesture so
+            // browsers grant permission for later TTS playback. Keep it short.
+            const synth = window.speechSynthesis;
+            if (synth) {
+                const u = new SpeechSynthesisUtterance('正在准备讲解');
+                u.lang = 'zh-CN';
+                // low volume where supported
+                try { u.volume = 0.2; } catch (e) {}
+                synth.speak(u);
+            }
+        } catch (e) {
+            // ignore
+        }
         onPlayGuide(landmark.name, landmark.id, landmark);
     };
+
+        // Audio debug UI removed
 
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col pb-0 animate-fadeIn relative scrollbar-hide">
@@ -92,10 +111,14 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
 
              <div className="mb-6">
                  <div className="mb-4 text-sm text-slate-500 dark:text-slate-400">快速操作</div>
-                 <div className="flex gap-2 mb-4">
-                     <button onClick={togglePlay} onPointerDown={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} className="flex-1 py-4 rounded-2xl font-bold text-lg bg-teal-600 text-white">{isPlayingMain ? '暂停讲解' : isPausedMain ? '继续讲解' : '开始讲解'}</button>
-                 </div>
+                      <div className="flex gap-2 mb-4">
+                          <button type="button" onClick={togglePlay} onPointerDown={() => { try { ensureAudioUnlockedNow(); primeSpeechSynthesisNow(); playSilentAudioNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); primeSpeechSynthesisNow(); playSilentAudioNow(); } catch (e){} }} className="w-full py-3 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-xl font-bold shadow-lg">
+                              {isPlayingMain ? '暂停讲解' : isPausedMain ? '继续讲解' : '开始讲解'}
+                          </button>
+                      </div>
              </div>
+
+            {/* Audio debug UI removed */}
 
              <div className="mb-10">
                 <div className="flex items-center justify-between mb-4">

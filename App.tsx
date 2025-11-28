@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Button } from 'antd-mobile';
 import { Coordinates, Landmark, AudioState, SubAttraction } from './types';
-import { findNearbyLandmarks, generateLandmarkAudio, identifyLandmarkFromMultimodal, fetchSubAttractions, searchLocation, searchLandmarks } from './services/geminiService';
+import { findNearbyLandmarks, generateLandmarkAudio, identifyLandmarkFromMultimodal, fetchSubAttractions, searchLocation, searchLandmarks, loadAMap } from './services/geminiService';
 import { unlockAudioOnUserGesture, ensureAudioUnlockedNow } from './utils/audioUtils';
 import Radar from './components/Radar';
 
@@ -125,7 +126,7 @@ const GlobalAudioPlayer: React.FC<GlobalAudioPlayerProps> = ({ audioState, onTog
     if (!audioState.isPlaying && !audioState.isPaused) return null;
 
     return (
-        <div className="fixed bottom-20 left-4 right-4 z-[60] animate-fadeIn">
+            <div className="fixed bottom-20 left-4 right-4 z-[60] animate-fadeIn">
             <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl p-3 shadow-2xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
                 {/* Visualizer / Icon */}
                 <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
@@ -151,8 +152,10 @@ const GlobalAudioPlayer: React.FC<GlobalAudioPlayerProps> = ({ audioState, onTog
                 </div>
 
                 {/* Controls */}
-                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                     <button 
+                        onPointerDown={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                        onTouchStart={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
                         onClick={(e) => { e.stopPropagation(); onTogglePlay(); }}
                         className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                     >
@@ -217,24 +220,20 @@ const DonationModal: React.FC<DonationModalProps> = ({ onClose }) => {
               <p className="text-lg font-bold text-slate-800 dark:text-white">支付成功</p>
               <p className="text-sm text-slate-400 mt-1">感谢您的慷慨！</p>
            </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {[1, 5, 10].map((amt) => (
-                <button key={amt} onClick={() => setAmount(amt)} className={`py-3 rounded-xl border font-bold transition-all ${amount === amt ? 'border-[#1677FF] bg-[#1677FF] bg-opacity-5 dark:bg-opacity-20 text-[#1677FF]' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-500'}`}>¥{amt}</button>
-              ))}
-              <div className="relative col-span-3">
-                 <input type="number" placeholder="自定义金额" className="w-full py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-[#1677FF] text-center" onChange={(e) => setAmount(Number(e.target.value))} />
-              </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-3 gap-3 mb-6">
+                            {[1, 5, 10].map((amt) => (
+                                <button key={amt} onClick={() => setAmount(amt)} className={`py-3 rounded-xl border font-bold transition-all ${amount === amt ? 'border-[#1677FF] bg-[#1677FF] bg-opacity-5 dark:bg-opacity-20 text-[#1677FF]' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-500'}`}>
+                                    ¥{amt}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
-            <button onClick={handlePayment} disabled={status === 'processing' || amount <= 0} className={`w-full py-3 rounded-xl font-bold text-white flex items-center justify-center shadow-lg transition-transform active:scale-95 ${status === 'processing' ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed' : 'bg-[#1677FF] hover:bg-blue-600 shadow-blue-200 dark:shadow-none'}`}>
-              {status === 'processing' ? "正在连接支付宝..." : <> <AlipayIcon /> 立即支付 ¥{amount || 0} </>}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+    );
 };
 
 // --- Extracted Category List Page ---
@@ -461,8 +460,11 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
 
     const subSpots = landmark.subAttractions || [];
 
+    // Audio debug collection removed from in-page landmark detail
+
     const togglePlay = () => {
         // Main button logic now toggles Play/Pause or starts new
+        console.log('landmark.name, landmark.id, landmark', landmark.name, landmark.id, landmark);
         onPlayGuide(landmark.name, landmark.id, landmark);
     };
 
@@ -524,11 +526,13 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
                  </div>
              )}
 
-             <div className="flex gap-2 mb-10">
-                 <button 
-                    onClick={togglePlay}
-                    disabled={audioState.isLoading}
-                    className={`flex-1 py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                      <div className="flex gap-2 mb-10">
+                      <button 
+                          onPointerDown={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                          onTouchStart={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                          onClick={togglePlay}
+                          disabled={audioState.isLoading}
+                          className={`flex-1 py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
                       isPlayingMain
                         ? 'bg-amber-500 text-white shadow-amber-200 dark:shadow-amber-900/30' // Pause Style
                         : isPausedMain
@@ -545,7 +549,7 @@ const LandmarkDetailPage: React.FC<LandmarkDetailProps> = ({ landmark, audioStat
                     ) : (
                        <><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> 开始讲解</>
                     )}
-                 </button>
+                   </button>
              </div>
 
              {/* Sub Attractions Section */}
@@ -733,6 +737,8 @@ const HomeView: React.FC<HomeViewProps> = ({
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Audio debug UI removed from HomeView
+
     const handleSubmit = () => {
         if (!searchQuery.trim()) return;
         onSearch(searchQuery);
@@ -773,6 +779,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                   className="bg-transparent border-none outline-none w-full text-sm placeholder-blue-100 text-white h-8" 
               />
             </div>
+
+            {/* Audio debug UI removed from HomeView */}
             
             <button 
                onClick={handleSubmit}
@@ -833,23 +841,23 @@ const HomeView: React.FC<HomeViewProps> = ({
                      {cameraImage ? (
                          <div className="relative w-full h-32 bg-black rounded-xl overflow-hidden">
                              <img src={cameraImage} className="w-full h-full object-cover" alt="capture" />
-                             <button onClick={() => setCameraImage(null)} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                             <Button onClick={() => setCameraImage(null)} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></Button>
                          </div>
                      ) : (
                          <div className="flex gap-2">
-                             <button onClick={handleOpenCamera} className="flex-1 py-3 bg-slate-50 dark:bg-slate-700 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
+                             <Button onClick={handleOpenCamera} className="flex-1 py-3 bg-slate-50 dark:bg-slate-700 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
                                  <CameraIcon /> <span className="text-sm">拍摄景物</span>
-                             </button>
+                             </Button>
                              {/* Hidden video element for capture */}
                              <div className={`fixed inset-0 bg-black z-[60] flex flex-col ${videoRef.current?.srcObject ? 'block' : 'hidden'}`}>
                                  <video ref={videoRef as unknown as React.LegacyRef<HTMLVideoElement>} className="w-full h-full object-cover" autoPlay playsInline muted></video>
                                  <div className="absolute bottom-10 left-0 w-full flex justify-center gap-8">
-                                     <button onClick={() => { 
+                                     <Button onClick={() => { 
                                          const s = videoRef.current?.srcObject as MediaStream; 
                                          s?.getTracks().forEach(t => t.stop()); 
                                          if(videoRef.current) videoRef.current.srcObject = null;
-                                     }} className="w-16 h-16 rounded-full bg-slate-800/50 text-white flex items-center justify-center border border-white">取消</button>
-                                     <button onClick={handleCapture} className="w-20 h-20 rounded-full bg-white border-4 border-slate-300 flex items-center justify-center shadow-lg"></button>
+                                     }} className="w-16 h-16 rounded-full bg-slate-800/50 text-white flex items-center justify-center border border-white">取消</Button>
+                                     <Button onClick={handleCapture} className="w-20 h-20 rounded-full bg-white border-4 border-slate-300 flex items-center justify-center shadow-lg"></Button>
                                  </div>
                              </div>
                              <canvas ref={canvasRef as unknown as React.LegacyRef<HTMLCanvasElement>} className="hidden" />
@@ -865,20 +873,20 @@ const HomeView: React.FC<HomeViewProps> = ({
                              className="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 text-sm focus:ring-2 ring-teal-500 outline-none dark:text-white" 
                              placeholder="输入问题 (例如: 这个塔多高?)"
                          />
-                         <button className="absolute right-2 top-2 p-1.5 bg-teal-500 rounded-lg text-white" onClick={handleIdentify} onPointerDown={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); } catch (e){} }}>
+                         <button className="absolute right-2 top-2 p-1.5 bg-teal-500 rounded-lg text-white" onPointerDown={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onTouchStart={() => { try { ensureAudioUnlockedNow(); } catch (e){} }} onClick={handleIdentify}>
                              <SendIcon />
                          </button>
                      </div>
                      
-                                         <button 
-                                             onClick={handleIdentify} 
-                                             onPointerDown={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
-                                             onTouchStart={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
-                                             disabled={scanning}
-                                             className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-teal-200 dark:shadow-none active:scale-95 transition-transform"
-                                         >
-                                             {scanning ? "分析中..." : "开始识别并讲解"}
-                                         </button>
+                                        <button 
+                                            onPointerDown={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                                            onTouchStart={() => { try { ensureAudioUnlockedNow(); unlockAudioOnUserGesture(); } catch (e){} }}
+                                            onClick={handleIdentify}
+                                            disabled={scanning}
+                                            className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-teal-200 dark:shadow-none active:scale-95 transition-transform"
+                                        >
+                                            {scanning ? "分析中..." : "开始识别并讲解"}
+                                        </button>
                  </div>
              </div>
           </div>
@@ -964,9 +972,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                         {user.name.charAt(0)}
                     </div>
                     <div className="ml-4 flex-1">
-                        <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between">
                             <h2 className="text-xl font-bold text-slate-800 dark:text-white">{user.name}</h2>
-                            <button onClick={() => setSubPage('edit_profile')} className="text-slate-400 hover:text-teal-500"><EditIcon /></button>
+                                                <button onClick={() => setSubPage('edit_profile')} className="text-slate-400 hover:text-teal-500"><EditIcon /></button>
                         </div>
                         <div className="flex items-center mt-1">
                             <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded-full mr-2">{user.level}</span>
@@ -1058,7 +1066,55 @@ const App: React.FC = () => {
   const [currentLandmark, setCurrentLandmark] = useState<Landmark | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('attractions');
+    // Navigation history stack (each entry stores a snapshot of view state)
+    const [navStack, setNavStack] = useState<Array<any>>([]);
+
+    const pushView = () => {
+        setNavStack(prev => [...prev, { activeTab, subPage, currentLandmark, activeCategory }]);
+    };
+
+    const popView = () => {
+        setNavStack(prev => {
+            if (!prev || prev.length === 0) {
+                // nothing to pop: go home
+                setActiveTab('home');
+                setSubPage(null);
+                return [];
+            }
+            const last = prev[prev.length - 1];
+            const rest = prev.slice(0, -1);
+            try {
+                setActiveTab(last.activeTab || 'home');
+                setCurrentLandmark(last.currentLandmark || null);
+                setActiveCategory(last.activeCategory || 'attractions');
+                setSubPage(last.subPage || null);
+            } catch (e) {}
+            return rest;
+        });
+    };
+
+    const navigateTo = (targetSubPage: SubPage, opts?: { activeTab?: 'home'|'profile', currentLandmark?: Landmark | null, activeCategory?: string }) => {
+        // push current view onto stack then navigate
+        pushView();
+        try {
+            if (opts?.activeTab) setActiveTab(opts.activeTab);
+            if (typeof opts?.activeCategory !== 'undefined') setActiveCategory(opts.activeCategory || 'attractions');
+            if (typeof opts?.currentLandmark !== 'undefined') setCurrentLandmark(opts.currentLandmark || null);
+        } catch (e) {}
+        setSubPage(targetSubPage);
+    };
   const [hasKeys, setHasKeys] = useState(false);
+    // Current API indicator for dev diagnostics (AMap, DeepSeek, Gemini, Local)
+    const [currentApi, setCurrentApi] = useState<string | null>(null);
+    // UI toast for fallback notifications
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    useEffect(() => {
+        if (!toastMessage) return;
+        const t = setTimeout(() => setToastMessage(null), 3000);
+        return () => clearTimeout(t);
+    }, [toastMessage]);
+
+    // Dev AMap Events panel removed. Logs will be written to console only via addAmapLog.
   
   // Search State
   const [searchQueryForPage, setSearchQueryForPage] = useState('');
@@ -1074,37 +1130,340 @@ const App: React.FC = () => {
   // New Service Integration: Store audio controls
   const audioControlsRef = useRef<{ stop: () => void; pause: () => void; resume: () => void } | null>(null);
 
+    // Listen for missing service keys / AMap events and show friendly toasts for diagnostics
+    const addAmapLog = (label: string, detail?: any) => {
+        try {
+            const ts = new Date().toLocaleTimeString();
+            console.log(ts, label, detail);
+
+            // Labels that should surface a visible toast to the user
+            const critical = new Set([
+                'amap-load-error',
+                'amap-search-failed',
+                'amap-geolocate-failed',
+                'amap-key-missing',
+                'gemini-key-missing',
+                'test-amap-failed',
+                'test-gemini-failed',
+                'convertFrom-ex',
+                'geocoder.getAddress-ex',
+                'geocoder-after-convert-ex'
+            ]);
+
+            if (critical.has(label)) {
+                try {
+                    let msg = '';
+                    if (!detail) msg = label;
+                    else if (typeof detail === 'string') msg = detail;
+                    else if (detail?.message) msg = detail.message;
+                    else msg = JSON.stringify(detail);
+                    setToastMessage(`${label}: ${msg}`);
+                } catch (e) {
+                    console.warn('addAmapLog toast failed', e);
+                }
+            }
+        } catch (e) {}
+    };
+
+    // Reverse geocode helper: try convertFrom (GPS->GCJ) when available, then geocoder.getAddress
+    // If reverse geocoding fails, return a formatted coordinate string so the UI can display the raw location.
+    const reverseGeocodeWithConvert = async (AMap: any, c: { latitude: number; longitude: number }): Promise<string | null> => {
+        const formatCoords = (lat: number, lng: number) => `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+        return new Promise((resolve) => {
+            try {
+                const geocoder = new AMap.Geocoder();
+
+                const tryDirect = () => {
+                    try {
+                        geocoder.getAddress([c.longitude, c.latitude], (gStatus: string, gRes: any) => {
+                            addAmapLog('geocoder.getAddress', { gStatus, gRes });
+                            if (gStatus === 'complete' && gRes && gRes.regeocode) {
+                                resolve(gRes.regeocode.formattedAddress || formatCoords(c.latitude, c.longitude));
+                            } else {
+                                // If no address found, return coordinates
+                                resolve(formatCoords(c.latitude, c.longitude));
+                            }
+                        });
+                    } catch (e) {
+                        addAmapLog('geocoder.getAddress-ex', String(e));
+                        resolve(formatCoords(c.latitude, c.longitude));
+                    }
+                };
+
+                if (typeof AMap.convertFrom === 'function') {
+                    try {
+                        (AMap as any).convertFrom([c.longitude, c.latitude], 'gps', (status: string, res: any) => {
+                            addAmapLog('AMap.convertFrom', { status, res });
+                            if (status === 'complete' && res && res.info === 'ok' && Array.isArray(res.locations) && res.locations.length) {
+                                const raw = res.locations[0];
+                                let convLng: number | null = null;
+                                let convLat: number | null = null;
+                                if (Array.isArray(raw) && raw.length >= 2) {
+                                    convLng = Number(raw[0]);
+                                    convLat = Number(raw[1]);
+                                } else if (raw && typeof raw === 'object' && ('lng' in raw || 'lon' in raw || 'lat' in raw)) {
+                                    convLng = Number((raw as any).lng ?? (raw as any).lon);
+                                    convLat = Number((raw as any).lat ?? (raw as any).lat);
+                                }
+
+                                if (convLng != null && convLat != null) {
+                                    try {
+                                        geocoder.getAddress([convLng, convLat], (gStatus: string, gRes: any) => {
+                                            addAmapLog('geocoder.getAddress-after-convert', { gStatus, gRes });
+                                            if (gStatus === 'complete' && gRes && gRes.regeocode) {
+                                                resolve(gRes.regeocode.formattedAddress || formatCoords(convLat, convLng));
+                                            } else {
+                                                // fallback to original coords
+                                                resolve(formatCoords(c.latitude, c.longitude));
+                                            }
+                                        });
+                                    } catch (e) {
+                                        addAmapLog('geocoder-after-convert-ex', String(e));
+                                        resolve(formatCoords(c.latitude, c.longitude));
+                                    }
+                                } else {
+                                    // Could not parse converted value
+                                    resolve(formatCoords(c.latitude, c.longitude));
+                                }
+                            } else {
+                                // convertFrom didn't yield, try direct
+                                tryDirect();
+                            }
+                        });
+                    } catch (e) {
+                        addAmapLog('convertFrom-ex', String(e));
+                        tryDirect();
+                    }
+                } else {
+                    tryDirect();
+                }
+            } catch (err) {
+                addAmapLog('reverseGeocode-ex', String(err));
+                resolve(formatCoords(c.latitude, c.longitude));
+            }
+        });
+    };
+
+    // Dev helpers: test AMap script load and Gemini module import from the running app
+    const testAmapKey = async () => {
+        try {
+            setToastMessage('Testing AMap script...');
+            setCurrentApi('AMap (test)');
+            addAmapLog('test-amap', 'starting');
+            await loadAMap();
+            addAmapLog('test-amap', 'AMap loaded OK');
+            setToastMessage('AMap script loaded OK');
+        } catch (e: any) {
+            addAmapLog('test-amap-failed', String(e));
+            setToastMessage('AMap test failed: ' + (e?.message || String(e)));
+        } finally {
+            setCurrentApi(null);
+        }
+    };
+
+    const testGeminiImport = async () => {
+        try {
+            setToastMessage('Testing Gemini import...');
+            addAmapLog('test-gemini', 'importing');
+            const gemKey = localStorage.getItem('GEMINI_API_KEY');
+            const cdnUrl = 'https://esm.sh/@google/genai';
+            const mod = await import(/* @vite-ignore */ cdnUrl);
+            addAmapLog('test-gemini', 'imported');
+            const GoogleGenAI = (mod as any).GoogleGenAI || (mod as any).default || mod;
+            try {
+                // Constructing may or may not perform network operations depending on library
+                // We attempt construction to detect immediate failures.
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const inst = new GoogleGenAI({ apiKey: gemKey || '' });
+                addAmapLog('test-gemini', 'constructed');
+                setToastMessage('Gemini module import OK (construction attempted)');
+            } catch (ctorErr: any) {
+                addAmapLog('test-gemini', 'construct-failed: ' + String(ctorErr));
+                setToastMessage('Gemini construct failed: ' + (ctorErr?.message || String(ctorErr)));
+            }
+        } catch (impErr: any) {
+            addAmapLog('test-gemini-failed', String(impErr));
+            setToastMessage('Gemini import failed: ' + (impErr?.message || String(impErr)));
+        }
+    };
+
+    useEffect(() => {
+        const onGeminiMissing = (ev: any) => {
+            try {
+                console.warn('Gemini key missing event received', ev?.detail);
+                setToastMessage('未配置 Gemini API Key，打开「服务配置」设置以继续');
+                addAmapLog('gemini-key-missing', ev?.detail);
+            } catch (e) {}
+        };
+
+        const onAmapKeyMissing = (ev: any) => {
+            try {
+                console.warn('AMap keys missing', ev?.detail);
+                setToastMessage('未配置 AMap Key/Secret，地图定位不可用');
+                addAmapLog('amap-key-missing', ev?.detail);
+            } catch (e) {}
+        };
+
+        const onAmapLoadError = (ev: any) => {
+            try {
+                console.error('AMap script load failed', ev?.detail);
+                setToastMessage(`AMap 加载失败: ${ev?.detail?.error || 'unknown'}`);
+                addAmapLog('amap-load-error', ev?.detail);
+            } catch (e) {}
+        };
+
+        const onAmapSearchFailed = (ev: any) => {
+            try {
+                console.warn('AMap search failed', ev?.detail);
+                const info = ev?.detail?.info || ev?.detail?.status || '未知';
+                setToastMessage(`AMap 查询失败: ${info}`);
+                addAmapLog('amap-search-failed', ev?.detail);
+            } catch (e) {}
+        };
+
+        const onAmapGeolocateFailed = (ev: any) => {
+            try {
+                console.warn('AMap geolocation failed', ev?.detail);
+                setToastMessage('AMap 定位失败，已回退到浏览器定位');
+                addAmapLog('amap-geolocate-failed', ev?.detail);
+            } catch (e) {}
+        };
+
+        window.addEventListener('gemini-key-missing', onGeminiMissing as EventListener);
+        window.addEventListener('amap-key-missing', onAmapKeyMissing as EventListener);
+        window.addEventListener('amap-load-error', onAmapLoadError as EventListener);
+        window.addEventListener('amap-search-failed', onAmapSearchFailed as EventListener);
+        window.addEventListener('amap-geolocate-failed', onAmapGeolocateFailed as EventListener);
+
+        return () => {
+            window.removeEventListener('gemini-key-missing', onGeminiMissing as EventListener);
+            window.removeEventListener('amap-key-missing', onAmapKeyMissing as EventListener);
+            window.removeEventListener('amap-load-error', onAmapLoadError as EventListener);
+            window.removeEventListener('amap-search-failed', onAmapSearchFailed as EventListener);
+            window.removeEventListener('amap-geolocate-failed', onAmapGeolocateFailed as EventListener);
+        };
+    }, []);
+    
+
   // Check keys on load
   useEffect(() => {
-    const k1 = localStorage.getItem("AMAP_KEY");
-    const k2 = localStorage.getItem("AMAP_SECRET");
-    const k3 = localStorage.getItem("DEEPSEEK_KEY");
+        // Read env values (if present)
+        const env = (import.meta as any).env || {};
+        const envAmapKey = env?.VITE_AMAP_KEY;
+        const envAmapSecret = env?.VITE_AMAP_SECRET;
+        const envDeepseek = env?.VITE_DEEPSEEK_KEY;
+        const envGemini = env?.VITE_API_KEY;
+
+        // DEV convenience: if running in dev mode and env keys exist, copy them into localStorage
+        // This is ONLY for local development convenience and won't run in production builds.
+        if (env?.DEV) {
+            try {
+                if (envAmapKey && !localStorage.getItem('AMAP_KEY')) {
+                    localStorage.setItem('AMAP_KEY', envAmapKey);
+                    addAmapLog('dev-write', { key: 'AMAP_KEY' });
+                }
+                if (envAmapSecret && !localStorage.getItem('AMAP_SECRET')) {
+                    localStorage.setItem('AMAP_SECRET', envAmapSecret);
+                    addAmapLog('dev-write', { key: 'AMAP_SECRET' });
+                }
+                if (envDeepseek && !localStorage.getItem('DEEPSEEK_KEY')) {
+                    localStorage.setItem('DEEPSEEK_KEY', envDeepseek);
+                    addAmapLog('dev-write', { key: 'DEEPSEEK_KEY' });
+                }
+                if (envGemini && !localStorage.getItem('GEMINI_API_KEY')) {
+                    localStorage.setItem('GEMINI_API_KEY', envGemini);
+                    addAmapLog('dev-write', { key: 'GEMINI_API_KEY' });
+                }
+            } catch (e) {
+                console.warn('Failed to write dev env keys to localStorage', e);
+            }
+        }
+
+        const k1 = localStorage.getItem("AMAP_KEY");
+        const k2 = localStorage.getItem("AMAP_SECRET");
+        const k3 = localStorage.getItem("DEEPSEEK_KEY");
         // Priority: LocalStorage -> Vite env var (Auto-config)
-        const k4 = localStorage.getItem("GEMINI_API_KEY") || (import.meta as any).env?.VITE_API_KEY;
-    
-    if ((k1 && k2 && k3) || k4) {
-      setHasKeys(true);
-    } else {
-      setHasKeys(false); // Still false, but we allow fallback
-    }
+        const k4 = localStorage.getItem("GEMINI_API_KEY") || envGemini;
+
+        if ((k1 && k2 && k3) || k4) {
+            setHasKeys(true);
+        } else {
+            setHasKeys(false); // Still false, but we allow fallback
+        }
   }, [subPage]);
 
-  const refreshLocation = () => {
+  const refreshLocation = async () => {
       setLocationName("定位中...");
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-          setCoords(c);
-          setLocationName("当前位置");
-          handleScan(c);
-        },
+
+      // First try AMap Geolocation (higher reliability in some regions)
+      try {
+          setCurrentApi('AMap (Geolocation)');
+          const AMap = await loadAMap();
+          await new Promise<void>((resolve, reject) => {
+              try {
+                  (AMap as any).plugin('AMap.Geolocation', () => {
+                      try {
+                          const geo = new (AMap as any).Geolocation({ enableHighAccuracy: true, timeout: 10000 });
+                          geo.getCurrentPosition((status: string, result: any) => {
+                              if (status === 'complete' && result && result.position) {
+                                          const c = { latitude: result.position.lat, longitude: result.position.lng };
+                                          setCoords(c);
+                                          // Try reverse geocoding to produce a friendly location name
+                                          try {
+                                              // Use helper that attempts convertFrom when needed
+                                              reverseGeocodeWithConvert(AMap, c).then((addr) => {
+                                                  if (addr) setLocationName(addr);
+                                                  else setLocationName('当前位置');
+                                              });
+                                          } catch (e) {
+                                              setLocationName('当前位置');
+                                          }
+                                          handleScan(c);
+                                          resolve();
+                                      } else {
+                                  try { window.dispatchEvent(new CustomEvent('amap-geolocate-failed', { detail: { status, result } })); } catch(e) {}
+                                  reject(new Error('AMAP_GEOLOCATE_FAILED'));
+                              }
+                          });
+                      } catch (err) { reject(err); }
+                  });
+              } catch (err) { reject(err); }
+          });
+          return;
+      } catch (e) {
+          console.warn('AMap geolocation failed, falling back to browser geolocation', e);
+      }
+
+        // Fallback to browser geolocation
+        setCurrentApi('Browser Geolocation');
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                    setCoords(c);
+                    // Try to use AMap reverse geocoding if AMap can be loaded; otherwise keep a generic label
+                        try {
+                        const AMap = await loadAMap();
+                        reverseGeocodeWithConvert(AMap, c).then((addr) => {
+                            if (addr) setLocationName(addr);
+                            else setLocationName('当前位置');
+                        });
+                        } catch (e) {
+                        // Could not load AMap for reverse geocoding; fall back to a generic label
+                        setLocationName('当前位置');
+                        }
+                    handleScan(c);
+                },
         (err) => {
           console.error("Loc error", err);
+          try {
+            setToastMessage(`定位失败: ${err?.code || ''} ${err?.message || ''}`);
+          } catch(e){}
           // If Geolocation fails, default to Beijing for Demo
           const demoCoords = { latitude: 39.9042, longitude: 116.4074 };
-          setCoords(demoCoords);
-          setLocationName("北京 (演示)");
-          handleScan(demoCoords);
+                    setCoords(demoCoords);
+                    setLocationName("北京 (演示)");
+                    handleScan(demoCoords);
         }
       );
   };
@@ -1131,6 +1490,9 @@ const App: React.FC = () => {
 
     // Get Location on Init
     refreshLocation();
+
+    // ensure DevAmapPanel is included in the DOM (no-op in production)
+    // (Panel is pure React component declared above; will render conditionally in the JSX)
 
     // Listen to Speech Synthesis events for global playing state
     const synth = window.speechSynthesis;
@@ -1165,6 +1527,7 @@ const App: React.FC = () => {
     // REMOVED STRICT KEY CHECK to allow Mock Data Fallback
     setScanning(true);
     try {
+            setCurrentApi('AMap / Nearby Search');
       const results = await findNearbyLandmarks(c);
       setLandmarks(results);
     } catch (e) {
@@ -1172,22 +1535,25 @@ const App: React.FC = () => {
       setLandmarks([]); // Should be covered by mock fallback inside findNearbyLandmarks
     } finally {
       setTimeout(() => setScanning(false), 2000);
+            setCurrentApi(null);
     }
   };
 
   const handleSearch = async (query: string) => {
       setIsSearching(true);
       setSearchQueryForPage(query);
-      setSubPage('search_results'); // Navigate immediately
+    navigateTo('search_results'); // Navigate immediately
       setSearchResults([]); // Clear previous
 
       try {
-        const results = await searchLandmarks(query);
+                setCurrentApi('AMap / Search');
+                const results = await searchLandmarks(query);
         setSearchResults(results);
       } catch (e) {
           handleError(e);
       } finally {
-          setIsSearching(false);
+                    setIsSearching(false);
+                    setCurrentApi(null);
       }
   };
 
@@ -1198,9 +1564,52 @@ const App: React.FC = () => {
     localStorage.setItem('travel_history', JSON.stringify(newHistory));
   };
 
-  const playAudio = async (name: string, id: string, fullLandmark?: Landmark) => {
-        // Ensure AudioContext is unlocked on mobile user gestures
+    const playAudio = async (name: string, id: string, fullLandmark?: Landmark) => {
+        // Ensure AudioContext / SpeechSynthesis is unlocked on mobile user gestures
         try { unlockAudioOnUserGesture(); } catch (e) { /* ignore */ }
+        // audio debug logs removed
+        try {
+            // Synchronously trigger a very short (near-silent) SpeechSynthesis utterance
+            // during the user gesture so browsers allow later speech playback.
+            const synth = window.speechSynthesis;
+            if (synth) {
+                const u = new SpeechSynthesisUtterance('\u200B');
+                try { u.volume = 0; } catch (e) {}
+                synth.speak(u);
+                setTimeout(() => { try { synth.cancel(); } catch (e) {} }, 50);
+            }
+        } catch (e) {
+            // ignore
+        }
+        // If no service keys configured, play a local fallback TTS immediately so the
+        // user gets audible feedback instead of a silent, unresponsive click.
+        if (!hasKeys) {
+            try {
+                stopAudio();
+                const textToSpeak = fullLandmark?.description || `正在播放示例讲解：${name}`;
+                const synth = window.speechSynthesis;
+                if (synth) {
+                    const u = new SpeechSynthesisUtterance(textToSpeak);
+                    u.lang = 'zh-CN';
+                    try { u.volume = 1; } catch (e) {}
+                    synth.speak(u);
+                    // Notify user that we're using local fallback
+                    try { setToastMessage('使用本地语音回退'); } catch (e) {}
+                    audioControlsRef.current = {
+                        stop: () => { try { synth.cancel(); } catch (e) {} },
+                        pause: () => { try { synth.pause(); } catch (e) {} },
+                        resume: () => { try { synth.resume(); } catch (e) {} }
+                    };
+                    setAudioState({ isPlaying: true, isPaused: false, isLoading: false, currentText: textToSpeak, playingItemName: name });
+                } else {
+                    // No speechSynthesis available - fallback to a visual hint
+                    alert('无法播放语音：当前设备不支持系统语音合成。');
+                }
+            } catch (e) {
+                handleError(e);
+            }
+            return;
+        }
     // 1. Play/Pause Logic if clicking the same item
     if (audioState.playingItemName === name) {
         if (audioState.isPlaying) {
@@ -1220,26 +1629,56 @@ const App: React.FC = () => {
 
     setAudioState({ isPlaying: false, isPaused: false, isLoading: true, currentText: null, playingItemName: name });
 
-    try {
+        try {
+            // debug logs removed
       if (!coords) throw new Error("No coords");
 
+        setCurrentApi('DeepSeek / Audio Generation');
       const result = await generateLandmarkAudio(name, coords, selectedVoice);
+            // debug logs removed
       
       // Add to history if it's a main landmark
       if (fullLandmark) {
           addToHistory(fullLandmark, result.text);
       }
 
-      // Play
-      result.play();
+    // Play
+    // debug logs removed
+    result.play();
+    // debug logs removed
       audioControlsRef.current = { stop: result.stop, pause: result.pause, resume: result.resume };
       
       setAudioState({ isPlaying: true, isPaused: false, isLoading: false, currentText: result.text, playingItemName: name });
 
-    } catch (e) {
-      handleError(e);
-      setAudioState({ isPlaying: false, isPaused: false, isLoading: false, currentText: null, playingItemName: null });
-    }
+        } catch (e) {
+            // debug logs removed
+            handleError(e);
+            // Attempt local TTS fallback so the UI doesn't feel unresponsive
+            try {
+                const textToSpeak = fullLandmark?.description || `为您播放 ${name} 的简短介绍`;
+                const synth = window.speechSynthesis;
+                if (synth) {
+                    // debug logs removed
+                            try { setToastMessage && setToastMessage('使用本地语音回退'); } catch (e) {}
+                    const u = new SpeechSynthesisUtterance(textToSpeak);
+                    u.lang = 'zh-CN';
+                    try { u.volume = 1; } catch (e2) {}
+                    synth.speak(u);
+                    audioControlsRef.current = {
+                        stop: () => { try { synth.cancel(); } catch (e3) {} },
+                        pause: () => { try { synth.pause(); } catch (e3) {} },
+                        resume: () => { try { synth.resume(); } catch (e3) {} }
+                    };
+                    setAudioState({ isPlaying: true, isPaused: false, isLoading: false, currentText: textToSpeak, playingItemName: name });
+                    return;
+                }
+            } catch (e2) {
+                // debug logs removed
+            }
+
+            // Final: mark as not playing if fallback not possible
+            setAudioState({ isPlaying: false, isPaused: false, isLoading: false, currentText: null, playingItemName: null });
+        }
   };
 
   const handleIdentify = async () => {
@@ -1251,6 +1690,7 @@ const App: React.FC = () => {
       }
       setScanning(true);
       try {
+          setCurrentApi('Multimodal Identify (DeepSeek/Gemini)');
           const result = await identifyLandmarkFromMultimodal(coords, cameraImage || undefined, userQuery || undefined, selectedVoice);
           
           // Add to Landmarks list as top item
@@ -1279,6 +1719,7 @@ const App: React.FC = () => {
           handleError(e);
       } finally {
           setScanning(false);
+          setCurrentApi(null);
       }
   };
 
@@ -1329,13 +1770,13 @@ const App: React.FC = () => {
     };
     setUser(mockUser);
     localStorage.setItem('user_profile', JSON.stringify(mockUser));
-    setSubPage(null);
+    popView();
   };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     alert("注册成功！请登录");
-    setSubPage('login');
+    navigateTo('login');
   };
 
   const handleUpdateProfile = (name: string, bio: string) => {
@@ -1343,7 +1784,7 @@ const App: React.FC = () => {
           const updated = { ...user, name, bio };
           setUser(updated);
           localStorage.setItem('user_profile', JSON.stringify(updated));
-          setSubPage(null);
+          popView();
       }
   };
 
@@ -1365,11 +1806,11 @@ const App: React.FC = () => {
       if (subPage === 'landmark_detail' && currentLandmark) {
           return (
             <div className="relative scrollbar-hide">
-              <div className="fixed top-10 left-4 z-50">
-                 <button onClick={() => { stopAudio(); setSubPage(null); }} className="p-2 rounded-full bg-black/30 backdrop-blur text-white shadow-lg">
-                   <BackIcon />
-                 </button>
-              </div>
+                        <div className="fixed top-6 left-4 z-[260] pointer-events-auto">
+                             <button type="button" onClick={() => { stopAudio(); popView(); }} className="p-2 rounded-full bg-black/30 backdrop-blur text-white shadow-lg">
+                                 <BackIcon />
+                             </button>
+                            </div>
               <LandmarkDetailPage 
                 landmark={currentLandmark} 
                 audioState={audioState} 
@@ -1392,29 +1833,29 @@ const App: React.FC = () => {
                   query={searchQueryForPage}
                   results={searchResults}
                   loading={isSearching}
-                  onBack={() => setSubPage(null)}
-                  onSelect={(lm) => { setCurrentLandmark(lm); setSubPage('landmark_detail'); }}
+                  onBack={() => { stopAudio(); popView(); }}
+                  onSelect={(lm) => { navigateTo('landmark_detail', { currentLandmark: lm }); }}
               />
           );
       }
 
       // Category List Page
-      if (subPage === 'category_list') {
-          return <CategoryListPage category={activeCategory} onBack={() => setSubPage(null)} />;
+        if (subPage === 'category_list') {
+            return <CategoryListPage category={activeCategory} onBack={() => { stopAudio(); popView(); }} />;
       }
     
       // Auth Pages
       if (subPage === 'login') {
           return (
               <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-6 pb-6 pt-16 flex flex-col justify-center animate-fadeIn scrollbar-hide">
-                  <button onClick={() => setSubPage(null)} className="absolute top-10 left-6 text-slate-400"><BackIcon /></button>
+                  <button onClick={() => { stopAudio(); popView(); }} className="absolute top-10 left-6 text-slate-400"><BackIcon /></button>
                   <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-8">欢迎回来</h2>
                   <form onSubmit={handleLogin} className="space-y-4">
                       <input type="text" placeholder="账号/手机号" className="w-full p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 ring-teal-500 outline-none dark:text-white" required />
                       <input type="password" placeholder="密码" className="w-full p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 ring-teal-500 outline-none dark:text-white" required />
                       <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-xl font-bold shadow-lg shadow-teal-200 dark:shadow-teal-900/30">登录</button>
                   </form>
-                  <p className="mt-6 text-center text-slate-500">还没有账号？ <span onClick={() => setSubPage('register')} className="text-teal-600 font-bold cursor-pointer">立即注册</span></p>
+                  <p className="mt-6 text-center text-slate-500">还没有账号？ <span onClick={() => navigateTo('register')} className="text-teal-600 font-bold cursor-pointer">立即注册</span></p>
               </div>
           );
       }
@@ -1422,7 +1863,7 @@ const App: React.FC = () => {
       if (subPage === 'register') {
           return (
               <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-6 pb-6 pt-16 flex flex-col justify-center animate-fadeIn scrollbar-hide">
-                  <button onClick={() => setSubPage('login')} className="absolute top-10 left-6 text-slate-400"><BackIcon /></button>
+                  <button onClick={() => { stopAudio(); popView(); }} className="absolute top-10 left-6 text-slate-400"><BackIcon /></button>
                   <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-8">创建账号</h2>
                   <form onSubmit={handleRegister} className="space-y-4">
                       <input type="text" placeholder="昵称" className="w-full p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none dark:text-white" required />
@@ -1438,7 +1879,7 @@ const App: React.FC = () => {
           return (
               <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-6 pb-6 pt-16 animate-fadeIn scrollbar-hide">
                   <div className="flex items-center mb-8">
-                      <button onClick={() => setSubPage(null)} className="mr-4 text-slate-500"><BackIcon /></button>
+                      <button onClick={() => { stopAudio(); popView(); }} className="mr-4 text-slate-500"><BackIcon /></button>
                       <h2 className="text-xl font-bold text-slate-800 dark:text-white">编辑资料</h2>
                   </div>
                   <form onSubmit={(e) => {
@@ -1470,7 +1911,7 @@ const App: React.FC = () => {
          return (
              <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-6 pb-6 pt-16 animate-fadeIn scrollbar-hide">
                  <div className="flex items-center mb-8">
-                     <button onClick={() => setSubPage(null)} className="mr-4 text-slate-500"><BackIcon /></button>
+                     <button onClick={() => { stopAudio(); popView(); }} className="mr-4 text-slate-500"><BackIcon /></button>
                      <h2 className="text-xl font-bold text-slate-800 dark:text-white">API Key 设置</h2>
                  </div>
                  <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm space-y-6">
@@ -1533,8 +1974,8 @@ const App: React.FC = () => {
                          </div>
                      </div>
     
-                     <div className="flex justify-end pt-2">
-                         <button onClick={() => setSubPage(null)} className="px-6 py-3 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-xl font-bold shadow-lg w-full">
+                         <div className="flex justify-end pt-2">
+                         <button onClick={() => { stopAudio(); popView(); }} className="px-6 py-3 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-xl font-bold shadow-lg w-full">
                              保存配置并返回
                          </button>
                      </div>
@@ -1554,7 +1995,7 @@ const App: React.FC = () => {
          return (
              <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-6 pb-6 pt-16 animate-fadeIn scrollbar-hide">
                  <div className="flex items-center mb-8">
-                     <button onClick={() => setSubPage(null)} className="mr-4 text-slate-500"><BackIcon /></button>
+                    <button onClick={() => popView()} className="mr-4 text-slate-500"><BackIcon /></button>
                      <h2 className="text-xl font-bold text-slate-800 dark:text-white">语音讲解偏好</h2>
                  </div>
                  <p className="text-sm text-slate-400 mb-4 px-1">注: 当前使用系统语音合成，音色取决于您的设备。</p>
@@ -1588,13 +2029,13 @@ const App: React.FC = () => {
           return (
               <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-6 pb-6 pt-16 animate-fadeIn scrollbar-hide">
                  <div className="flex items-center mb-8">
-                     <button onClick={() => setSubPage(null)} className="mr-4 text-slate-500"><BackIcon /></button>
+                     <button onClick={() => popView()} className="mr-4 text-slate-500"><BackIcon /></button>
                      <h2 className="text-xl font-bold text-slate-800 dark:text-white">历史讲解记录</h2>
                  </div>
                  <div className="space-y-6 relative border-l-2 border-slate-200 dark:border-slate-700 ml-3 pl-6">
                      {history.length === 0 && <p className="text-slate-400">暂无记录</p>}
                      {history.map((h, i) => (
-                         <div key={i} className="relative cursor-pointer group" onClick={() => { setCurrentLandmark(h); setSubPage('landmark_detail'); }}>
+                         <div key={i} className="relative cursor-pointer group" onClick={() => { navigateTo('landmark_detail', { currentLandmark: h }); }}>
                              <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-teal-500 border-4 border-white dark:border-slate-900"></div>
                              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 group-hover:border-teal-300 transition-colors">
                                  <div className="flex justify-between items-start mb-2">
@@ -1626,13 +2067,13 @@ const App: React.FC = () => {
                 videoRef={videoRef}
                 canvasRef={canvasRef}
                 handleCapture={handleCapture}
-                onLandmarkClick={(lm) => { setCurrentLandmark(lm); setSubPage('landmark_detail'); }}
-                onCategoryClick={(cat) => { setActiveCategory(cat); setSubPage('category_list'); }}
+                onLandmarkClick={(lm) => { navigateTo('landmark_detail', { currentLandmark: lm }); }}
+                onCategoryClick={(cat) => { navigateTo('category_list', { activeCategory: cat }); }}
                 onSearch={handleSearch}
                 onRefreshLocation={refreshLocation}
                 locationName={locationName}
                 hasKeys={hasKeys}
-                onSetupKeys={() => { setActiveTab('profile'); setSubPage('api_key_settings'); }}
+                onSetupKeys={() => { navigateTo('api_key_settings', { activeTab: 'profile' }); }}
              />;
       } else {
              return <ProfileView 
@@ -1654,6 +2095,15 @@ const App: React.FC = () => {
          {renderContent()}
       </div>
 
+            {/* Toast for fallback notifications */}
+            {toastMessage && (
+                <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[160] bg-black/80 text-white px-4 py-2 rounded-lg text-sm shadow-lg">
+                    {toastMessage}
+                </div>
+            )}
+
+            {/* Global audio debug UI removed */}
+
       {/* Global Components */}
       <GlobalAudioPlayer 
           audioState={audioState} 
@@ -1662,6 +2112,22 @@ const App: React.FC = () => {
       />
       
       {showDonation && <DonationModal onClose={() => setShowDonation(false)} />}
+
+            {/* Dev-only navStack inspector */}
+            {((import.meta as any).env?.DEV) && (
+                <div className="fixed right-4 bottom-32 z-[200]">
+                    <button onClick={() => { console.log('navStack snapshot', navStack); alert('navStack length: ' + navStack.length); }} className="px-3 py-2 bg-black/70 text-white rounded-md text-sm">Dev: Log navStack ({navStack.length})</button>
+                </div>
+            )}
+
+            {/* Current API badge (left-bottom) */}
+            {currentApi && (
+                <div className="fixed left-4 bottom-20 z-[200] pointer-events-none">
+                    <div className="px-3 py-1 rounded-md bg-black/70 text-white text-xs shadow-lg">
+                        当前调用: {currentApi}
+                    </div>
+                </div>
+            )}
 
       {/* Bottom Navigation Bar */}
       {!subPage && (

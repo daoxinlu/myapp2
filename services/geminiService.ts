@@ -9,8 +9,10 @@ import { Coordinates, Landmark, SubAttraction } from "../types";
  */
 const getKeys = () => {
   return {
-    amapKey: localStorage.getItem("AMAP_KEY") || "",
-    amapSecret: localStorage.getItem("AMAP_SECRET") || "",
+        // AMap keys: prefer localStorage -> Vite env -> empty
+        // For security, avoid hardcoding secrets in source. Use `.env.local` or localStorage.
+        amapKey: localStorage.getItem("AMAP_KEY") || (import.meta as any).env?.VITE_AMAP_KEY || "",
+        amapSecret: localStorage.getItem("AMAP_SECRET") || (import.meta as any).env?.VITE_AMAP_SECRET || "",
     llmKey: localStorage.getItem("DEEPSEEK_KEY") || "",
     // Priority: LocalStorage -> Environment Variable (Auto-config)
         geminiKey: localStorage.getItem("GEMINI_API_KEY") || (import.meta as any).env?.VITE_API_KEY || ""
@@ -33,7 +35,7 @@ const MOCK_LANDMARKS: Landmark[] = [
 
 // --- AMap Loader Helper ---
 let amapLoaded = false;
-const loadAMap = (): Promise<any> => {
+export const loadAMap = (): Promise<any> => {
   return new Promise((resolve, reject) => {
     if (amapLoaded && (window as any).AMap) {
       resolve((window as any).AMap);
@@ -41,10 +43,13 @@ const loadAMap = (): Promise<any> => {
     }
 
     const { amapKey, amapSecret } = getKeys();
-    if (!amapKey || !amapSecret) {
-      reject(new Error("AMAP_KEY_MISSING"));
-      return;
-    }
+        if (!amapKey || !amapSecret) {
+            try {
+                window.dispatchEvent(new CustomEvent('amap-key-missing', { detail: { message: 'AMap key/secret missing' } }));
+            } catch (e) {}
+            reject(new Error("AMAP_KEY_MISSING"));
+            return;
+        }
 
     // Set Security Config
     (window as any)._AMapSecurityConfig = {
@@ -52,13 +57,19 @@ const loadAMap = (): Promise<any> => {
     };
 
     const script = document.createElement("script");
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${amapKey}&plugin=AMap.PlaceSearch,AMap.Geocoder`;
+    // Include Geolocation plugin so we can use AMap.Geolocation for locating on devices
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${amapKey}&plugin=AMap.PlaceSearch,AMap.Geocoder,AMap.Geolocation`;
     script.async = true;
-    script.onload = () => {
-      amapLoaded = true;
-      resolve((window as any).AMap);
-    };
-    script.onerror = (e) => reject(e);
+        script.onload = () => {
+            amapLoaded = true;
+            resolve((window as any).AMap);
+        };
+        script.onerror = (e) => {
+            try {
+                window.dispatchEvent(new CustomEvent('amap-load-error', { detail: { error: (e as any)?.message || String(e) } }));
+            } catch (ev) {}
+            reject(e);
+        };
     document.head.appendChild(script);
   });
 };
@@ -100,7 +111,13 @@ const callDeepSeek = async (systemPrompt: string, userPrompt: string): Promise<s
 // --- Gemini Fallback Helper ---
 const callGemini = async (prompt: string | any, model: string = "gemini-2.5-flash", config: any = {}) => {
     const { geminiKey } = getKeys();
-    if (!geminiKey) throw new Error("GEMINI_KEY_MISSING");
+    if (!geminiKey) {
+        // Emit a global event so the UI can react (show settings/toast) instead of hard-crashing
+        try {
+            window.dispatchEvent(new CustomEvent('gemini-key-missing', { detail: 'GEMINI_KEY_MISSING' }));
+        } catch (e) {}
+        throw new Error("GEMINI_KEY_MISSING");
+    }
 
     try {
         // Dynamically import @google/genai only when needed. This avoids a hard dependency at build time
@@ -161,6 +178,9 @@ export const findNearbyLandmarks = async (coords: Coordinates): Promise<Landmark
                     }));
                     resolve(landmarks);
                 } else {
+                    try {
+                        window.dispatchEvent(new CustomEvent('amap-search-failed', { detail: { status, info: result?.info, result } }));
+                    } catch (ev) {}
                     resolve([]); // AMap returned empty, try fallback?
                 }
             });
@@ -170,34 +190,40 @@ export const findNearbyLandmarks = async (coords: Coordinates): Promise<Landmark
       }
   }
 
-  // 2. Fallback to Gemini
+  // 2. Fallback to Gemini (skip if no key)
   try {
-      const response = await callGemini(
-          "Find 5 popular tourist landmarks near this location.",
-          "gemini-2.5-flash",
-          {
-             tools: [{ googleMaps: {} }],
-             toolConfig: { retrievalConfig: { latLng: { latitude: coords.latitude, longitude: coords.longitude } } }
-          }
-      );
-      
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      const landmarks: Landmark[] = [];
-      
-      chunks.forEach((chunk: any, index: number) => {
-          if (chunk.web?.title) {
-              landmarks.push({
-                  id: `g-${index}`,
-                  name: chunk.web.title,
-                  description: "Google Maps 推荐景点",
-                  distance: "附近",
-                  type: "景点"
-              });
-          }
-      });
-      
-      // If we got some landmarks via Google Maps grounding, return them
-      if (landmarks.length > 0) return landmarks;
+      const { geminiKey } = getKeys();
+      if (!geminiKey) {
+          // Notify UI once and continue to final fallback
+          window.dispatchEvent(new CustomEvent('gemini-key-missing', { detail: 'GEMINI_KEY_MISSING' }));
+      } else {
+          const response = await callGemini(
+              "Find 5 popular tourist landmarks near this location.",
+              "gemini-2.5-flash",
+              {
+                 tools: [{ googleMaps: {} }],
+                 toolConfig: { retrievalConfig: { latLng: { latitude: coords.latitude, longitude: coords.longitude } } }
+              }
+          );
+          
+          const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+          const landmarks: Landmark[] = [];
+          
+          chunks.forEach((chunk: any, index: number) => {
+              if (chunk.web?.title) {
+                  landmarks.push({
+                      id: `g-${index}`,
+                      name: chunk.web.title,
+                      description: "Google Maps 推荐景点",
+                      distance: "附近",
+                      type: "景点"
+                  });
+              }
+          });
+          
+          // If we got some landmarks via Google Maps grounding, return them
+          if (landmarks.length > 0) return landmarks;
+      }
 
   } catch (e) {
       console.warn("Gemini Nearby Search failed", e);
@@ -231,6 +257,9 @@ export const searchLandmarks = async (query: string): Promise<Landmark[]> => {
                         }));
                         resolve(landmarks);
                     } else {
+                        try {
+                            window.dispatchEvent(new CustomEvent('amap-search-failed', { detail: { status, info: result?.info, result } }));
+                        } catch (ev) {}
                         resolve([]);
                     }
                 });
@@ -279,6 +308,9 @@ export const searchLocation = async (query: string): Promise<{ coords: Coordinat
                             address: poi.address || poi.name
                         });
                     } else {
+                        try {
+                            window.dispatchEvent(new CustomEvent('amap-search-failed', { detail: { status, info: result?.info, result } }));
+                        } catch (ev) {}
                         resolve(null);
                     }
                 });
@@ -369,8 +401,14 @@ export const generateLandmarkAudio = async (
     // 2. Try Gemini
     if (!scriptText) {
         try {
-            const res = await callGemini(systemPrompt + " " + userPrompt);
-            scriptText = res.text || "";
+            const { geminiKey } = getKeys();
+            if (!geminiKey) {
+                // Notify UI and skip Gemini attempt
+                try { window.dispatchEvent(new CustomEvent('gemini-key-missing', { detail: 'GEMINI_KEY_MISSING' })); } catch(e) {}
+            } else {
+                const res = await callGemini(systemPrompt + " " + userPrompt);
+                scriptText = res.text || "";
+            }
         } catch (e) { 
              // 3. Fallback Text
             scriptText = `欢迎来到${landmarkName}。这是一个非常值得游览的地方，拥有悠久的历史和独特的文化魅力。请您尽情欣赏这里的美景。`;

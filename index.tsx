@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// antd-mobile global styles
+import 'antd-mobile/es/global';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

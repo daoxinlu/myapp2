@@ -47,6 +47,75 @@ export function ensureAudioUnlockedNow(): void {
     // ignore
   }
 }
+
+/**
+ * Try to prime the Web Speech API (SpeechSynthesis) by issuing a very short
+ * utterance during a user gesture and then cancelling it. Some mobile
+ * browsers only allow speech synthesis to start when it is initiated directly
+ * from a user gesture; this helper attempts to trigger that permission.
+ */
+export function primeSpeechSynthesisNow(): void {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    // Create a very short utterance. Use a low-volume marker and cancel quickly.
+    const u = new SpeechSynthesisUtterance('\u200B'); // zero-width space
+    // Some platforms ignore volume=0; keep it to minimal settings
+    try { u.volume = 0; } catch (e) {}
+    synth.speak(u);
+    // Cancel shortly after to avoid audible output
+    setTimeout(() => {
+      try { synth.cancel(); } catch (e) {}
+    }, 50);
+  } catch (e) {
+    // ignore
+  }
+}
+
+/**
+ * Play a very short silent buffer through the shared AudioContext to ensure
+ * the WebAudio output is unlocked. This approach is effective on many mobile
+ * browsers where creating/resuming an AudioContext alone is not sufficient.
+ */
+export function playSilentAudioNow(): void {
+  try {
+    const w = window as any;
+    const AudioCtx = w.AudioContext || w.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!w.__APP_AUDIO_CONTEXT) {
+      try {
+        w.__APP_AUDIO_CONTEXT = new AudioCtx();
+      } catch (e) {
+        return;
+      }
+    }
+
+    const ctx: AudioContext = w.__APP_AUDIO_CONTEXT;
+    // Try to resume if suspended
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    try {
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.01, ctx.sampleRate); // 10ms silent
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(ctx.destination);
+      // Start and stop quickly
+      src.start(0);
+      setTimeout(() => {
+        try { src.stop(); } catch (e) {}
+      }, 20);
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Debug/logging helpers removed (no in-app audio debug collection).
 /**
  * Decodes a base64 string into a Uint8Array.
  */
