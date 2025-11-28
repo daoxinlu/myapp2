@@ -1,4 +1,27 @@
 /**
+ * Try to unlock/create an AudioContext on the first user gesture.
+ * Many mobile browsers require a user gesture to start audio. Call this
+ * on app mount and it will attach a one-time listener to resume AudioContext.
+ */
+export function unlockAudioOnUserGesture(): void {
+  try {
+    const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      const resume = async () => {
+        try {
+          await ctx.resume();
+        } catch (e) {}
+        window.removeEventListener('touchend', resume);
+        window.removeEventListener('click', resume);
+      };
+      window.addEventListener('touchend', resume, { passive: true });
+      window.addEventListener('click', resume);
+    }
+  } catch (e) {}
+}
+/**
  * Decodes a base64 string into a Uint8Array.
  */
 export function decodeBase64(base64: string): Uint8Array {

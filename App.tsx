@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Coordinates, Landmark, AudioState, SubAttraction } from './types';
 import { findNearbyLandmarks, generateLandmarkAudio, identifyLandmarkFromMultimodal, fetchSubAttractions, searchLocation, searchLandmarks } from './services/geminiService';
+import { unlockAudioOnUserGesture } from './utils/audioUtils';
 import Radar from './components/Radar';
 
 // --- Types ---
@@ -1196,6 +1197,8 @@ const App: React.FC = () => {
   };
 
   const playAudio = async (name: string, id: string, fullLandmark?: Landmark) => {
+        // Ensure AudioContext is unlocked on mobile user gestures
+        try { unlockAudioOnUserGesture(); } catch (e) { /* ignore */ }
     // 1. Play/Pause Logic if clicking the same item
     if (audioState.playingItemName === name) {
         if (audioState.isPlaying) {
@@ -1238,6 +1241,8 @@ const App: React.FC = () => {
   };
 
   const handleIdentify = async () => {
+      // Ensure audio is unlocked on the user gesture that triggers identification + play
+      try { unlockAudioOnUserGesture(); } catch (e) {}
       if (!coords) {
           alert("正在获取定位...");
           return;

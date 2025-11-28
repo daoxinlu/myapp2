@@ -26,3 +26,18 @@ export interface AudioState {
   currentText: string | null;
   playingItemName?: string | null; // Track specific item name playing
 }
+
+export interface User {
+  id: string;
+  name: string;
+  avatarColor?: string;
+}
+
+export interface Review {
+  id: string;
+  user: string;
+  avatarColor?: string;
+  rating: number;
+  text: string;
+  date: string;
+}
