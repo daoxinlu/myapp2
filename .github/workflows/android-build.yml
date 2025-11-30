@@ -1,0 +1,66 @@
+name: Android CI Build (Capacitor)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Install Capacitor and add android platform
+        run: |
+          npm install @capacitor/cli @capacitor/core --no-save
+          npx cap add android || true
+          npx cap sync android --deploy
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 33
+          build-tools: '33.0.2'
+          ndk: false
+
+      - name: Build release bundle (attempt, may require keystore)
+        working-directory: android
+        run: |
+          chmod +x gradlew || true
+          ./gradlew bundleRelease || true
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew || true
+          ./gradlew assembleDebug
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-artifacts
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/debug/app-debug.apk

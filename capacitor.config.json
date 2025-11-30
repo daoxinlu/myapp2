@@ -1,0 +1,6 @@
+{
+  "appId": "com.daoxin.travelpal",
+  "appName": "TravelPal",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
