@@ -33,6 +33,8 @@ interface Props {
   locationName: string;
   hasKeys: boolean;
   onSetupKeys: () => void;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
 
   // search
   searchQueryForPage: string;
@@ -302,8 +304,8 @@ const MainRouter: React.FC<Props> = (props) => {
     return (
       <ProfileView
         user={props.user || null}
-        isDarkMode={false}
-        toggleTheme={() => {}}
+          isDarkMode={props.isDarkMode}
+          toggleTheme={props.toggleTheme}
         setSubPage={(p: any) => navigateTo(p)}
         setShowDonation={setShowDonation}
         handleLogout={handleLogout}

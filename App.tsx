@@ -797,6 +797,8 @@ const AppCore: React.FC = () => {
         setCurrentLandmark={setCurrentLandmark}
         currentLandmark={currentLandmark}
         playAudio={playAudio}
+                isDarkMode={isDarkMode}
+                toggleTheme={toggleTheme}
       />
     );
   };
