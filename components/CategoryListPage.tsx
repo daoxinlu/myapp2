@@ -1,11 +1,12 @@
 import React from 'react';
-import { Button } from 'antd-mobile';
+import { BackIcon, StarIcon } from './icons';
 
-const BackIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-);
+interface CategoryListPageProps {
+  category: string;
+  onBack: () => void;
+}
 
-const CategoryListPage: React.FC<{ category: string, onBack: () => void }> = ({ category, onBack }) => {
+const CategoryListPage: React.FC<CategoryListPageProps> = ({ category, onBack }) => {
     const getCategoryData = () => {
         switch(category) {
             case 'food':
@@ -15,7 +16,7 @@ const CategoryListPage: React.FC<{ category: string, onBack: () => void }> = ({ 
                         { id: 'f1', title: '老北京炸酱面', desc: '地道风味，面条劲道', rating: 4.8, price: '¥35/人', dist: '500m', tag: '老字号', imgColor: 'from-orange-400 to-red-500' },
                         { id: 'f2', title: '四季民福烤鸭', desc: '皮酥肉嫩，果木炭火', rating: 4.9, price: '¥180/人', dist: '1.2km', tag: '必吃榜', imgColor: 'from-red-500 to-rose-600' },
                         { id: 'f3', title: '门框胡同卤煮', desc: '百年传承，汤浓味厚', rating: 4.5, price: '¥45/人', dist: '800m', tag: '特色小吃', imgColor: 'from-amber-500 to-orange-600' },
-                        { id: 'f4', title: '东来顺饭庄', desc: '铜锅涮肉，选料精细', rating: 4.7, price: '¥1200起', dist: '2.5km', tag: '非遗美食', imgColor: 'from-teal-500 to-green-600' }
+                        { id: 'f4', title: '东来顺饭庄', desc: '铜锅涮肉，选料精细', rating: 4.7, price: '¥120/人', dist: '2.5km', tag: '非遗美食', imgColor: 'from-teal-500 to-green-600' }
                     ]
                 };
             case 'hotels':
@@ -53,30 +54,60 @@ const CategoryListPage: React.FC<{ category: string, onBack: () => void }> = ({ 
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20 animate-fadeIn scrollbar-hide">
+            {/* Header */}
             <div className="fixed top-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-40 border-b border-slate-100 dark:border-slate-800 pt-12 pb-3 px-4">
                 <div className="flex items-center">
-                    <Button onClick={onBack} className="p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                    <button onClick={onBack} className="p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
                         <BackIcon />
-                    </Button>
+                    </button>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white ml-2">{data.title}</h2>
                 </div>
             </div>
 
-            <div className="pt-24 px-4">
-                <div className="grid gap-4">
-                    {data.items.map(item => (
-                        <div key={item.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                            <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-bold text-slate-800 dark:text-white">{item.title}</h3>
-                                <span className="text-xs text-slate-400">{(item as any).dist || ''}</span>
-                            </div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{item.desc}</p>
+            {/* Content List */}
+            <div className="pt-36 px-4 space-y-4">
+                {data.items.map((item: any) => (
+                    <div key={item.id} className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-sm border border-slate-100 dark:border-slate-700 active:scale-98 transition-transform flex gap-3">
+                        <div className={`w-28 h-28 rounded-lg bg-gradient-to-br ${item.imgColor} flex-shrink-0 relative overflow-hidden group`}>
+                             <div className="absolute inset-0 flex items-center justify-center text-white/30">
+                                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                             </div>
+                             {item.tag && <span className="absolute top-1 left-1 bg-black/30 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded">{item.tag}</span>}
                         </div>
-                    ))}
-                </div>
+                        
+                        <div className="flex-1 flex flex-col justify-between py-1">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 dark:text-white line-clamp-1">{item.title}</h3>
+                                {item.author && (
+                                    <div className="flex items-center mt-1 mb-1">
+                                       <div className={`w-4 h-4 rounded-full ${item.avatar} mr-1.5`}></div>
+                                       <span className="text-xs text-slate-500">{item.author}</span>
+                                    </div>
+                                )}
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">{item.desc}</p>
+                            </div>
+                            
+                            <div className="flex items-end justify-between mt-2">
+                                <div className="flex flex-col">
+                                    {item.rating && (
+                                        <div className="flex items-center gap-0.5">
+                                            {[1,2,3,4,5].map(i => <StarIcon key={i} filled={i <= Math.round(item.rating)} />)}
+                                            <span className="text-xs font-bold text-orange-500 ml-1">{item.rating}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    {item.price && <div className="text-sm font-bold text-red-500">{item.price}</div>}
+                                    {item.dist && <div className="text-xs text-slate-400 mt-0.5">{item.dist}</div>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
 };
 
 export default CategoryListPage;
+

@@ -8,23 +8,24 @@ This document explains where to configure API keys used by the app and recommend
 - `GEMINI_API_KEY` / `VITE_API_KEY` — Gemini / Google AI key used for fallbacks and web grounding.
 
 ## Local development (recommended)
-- Use a local `.env.local` file for Vite env variables (do NOT commit this file):
 
-```
-VITE_API_KEY=your_gemini_key_here
-VITE_AMAP_KEY=your_amap_key_here
-VITE_AMAP_SECRET=your_amap_secret_here
-```
+Keys are now entered manually through the app's **API Key 设置** page at runtime. The app no longer reads or writes API keys from `localStorage` or automatically copies Vite env values into the client.
 
-- Or set keys in browser `localStorage` from DevTools (immediate):
+For development you have two safe options:
 
-```js
-localStorage.setItem('AMAP_KEY', 'your_amap_key_here');
-localStorage.setItem('AMAP_SECRET', 'your_amap_secret_here');
-localStorage.setItem('GEMINI_API_KEY', 'your_gemini_key_here');
-```
+- Keep keys only on your development backend (recommended): run the `server/proxy-example.js` and set `DEEPSEEK_KEY` as a server environment variable so the frontend calls the proxy.
+- Or temporarily enter keys in the app's API Key UI (they are kept in-memory for the session). Do not commit or share any keys used here.
 
-The app prefers `localStorage` keys first, then Vite env values.
+## Using DeepSeek securely in development
+
+
+If you do use `.env.local` for server-side builds, do NOT put any production secrets there that end up in frontend bundles. Keep secrets on the server or in CI secrets.
+
+- The repo includes `server/proxy-example.js` — recommended for production: run a small server that holds the `DEEPSEEK_KEY` in an environment variable (never put it in frontend code). The frontend can call `/api/deepseek` which forwards the request from the server.
+
+## Important security notes
+- Never commit `.env.local` or any file containing secrets to the repository. We added `.gitignore` to ignore `.env.local`.
+- For production, keep secrets in server environment variables or a secrets manager and use a server-side proxy for all LLM/AI calls.
 
 ## Production security (strongly recommended)
 - Do NOT embed your production keys in frontend code or public repos.

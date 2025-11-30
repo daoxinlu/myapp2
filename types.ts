@@ -30,9 +30,12 @@ export interface AudioState {
 export interface User {
   id: string;
   name: string;
-  avatarColor?: string;
+  email: string;
+  level: string;
+  isVip: boolean;
+  avatarColor: string;
+  bio: string;
 }
-
 export interface Review {
   id: string;
   user: string;

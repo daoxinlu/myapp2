@@ -7,21 +7,48 @@ import { Coordinates, Landmark, SubAttraction } from "../types";
 /**
  * CONFIGURATION MANAGEMENT
  */
-const getKeys = () => {
-  return {
-        // AMap keys: prefer localStorage -> Vite env -> empty
-        // For security, avoid hardcoding secrets in source. Use `.env.local` or localStorage.
-        amapKey: localStorage.getItem("AMAP_KEY") || (import.meta as any).env?.VITE_AMAP_KEY || "",
-        amapSecret: localStorage.getItem("AMAP_SECRET") || (import.meta as any).env?.VITE_AMAP_SECRET || "",
-    llmKey: localStorage.getItem("DEEPSEEK_KEY") || "",
-    // Priority: LocalStorage -> Environment Variable (Auto-config)
-        geminiKey: localStorage.getItem("GEMINI_API_KEY") || (import.meta as any).env?.VITE_API_KEY || ""
-  };
+// In-memory key store. Keys must be provided manually through the exported setters.
+let _amapKey = '';
+let _amapSecret = '';
+let _deepseekKey = ''; // note: DeepSeek should ideally live on the server; client-side key usage is discouraged
+let _geminiKey = '';
+
+export const setAmapKeys = (key: string, secret: string) => {
+    _amapKey = key || '';
+    _amapSecret = secret || '';
 };
+
+export const setDeepseekKey = (key: string) => {
+    _deepseekKey = key || '';
+};
+
+export const setGeminiKey = (key: string) => {
+    _geminiKey = key || '';
+};
+
+export const clearAllKeys = () => {
+    _amapKey = '';
+    _amapSecret = '';
+    _deepseekKey = '';
+    _geminiKey = '';
+};
+
+export const getKeys = () => ({
+    amapKey: _amapKey,
+    amapSecret: _amapSecret,
+    llmKey: _deepseekKey,
+    geminiKey: _geminiKey
+});
 
 const hasDomesticKeys = () => {
     const { amapKey, amapSecret, llmKey } = getKeys();
     return !!(amapKey && amapSecret && llmKey);
+};
+
+// AMap-specific presence check: return true if AMap key/secret are configured.
+const hasAmapKeys = () => {
+    const { amapKey, amapSecret } = getKeys();
+    return !!(amapKey && amapSecret);
 };
 
 // --- Mock Data for Fallback ---
@@ -76,46 +103,48 @@ export const loadAMap = (): Promise<any> => {
 
 // --- LLM Helper (DeepSeek) ---
 const callDeepSeek = async (systemPrompt: string, userPrompt: string): Promise<string> => {
-    const { llmKey } = getKeys();
-    if (!llmKey) throw new Error("LLM_KEY_MISSING");
-
+    // Enforce proxy-only usage: do NOT use client-side DEEPSEEK_KEY.
+    // This keeps the secret on the server and avoids leaking keys in build artifacts.
     try {
-        const response = await fetch("https://api.deepseek.com/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${llmKey}`
-            },
+        if (typeof window === 'undefined') throw new Error('NO_WINDOW');
+        const proxyBase = (import.meta as any).env?.VITE_PROXY_BASE || '';
+        const base = proxyBase ? proxyBase.replace(/\/$/, '') : '';
+        const proxyUrl = base ? `${base}/api/deepseek` : '/api/deepseek';
+
+        const proxyResp = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: "deepseek-chat",
+                model: 'deepseek-chat',
                 messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
-                stream: false
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ]
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`LLM API Error: ${response.statusText}`);
+        if (!proxyResp.ok) {
+            // Notify UI that proxy is unavailable or returned an error
+            try { window.dispatchEvent(new CustomEvent('deepseek-proxy-unavailable', { detail: { status: proxyResp.status, statusText: proxyResp.statusText } })); } catch (e) {}
+            throw new Error(`DEEPSEEK_PROXY_ERROR: ${proxyResp.status} ${proxyResp.statusText}`);
         }
 
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || "";
+        const pData = await proxyResp.json();
+        return pData.choices?.[0]?.message?.content || '';
     } catch (e) {
-        console.warn("DeepSeek call failed", e);
-        return "";
+        console.warn('DeepSeek proxy call failed', e);
+        try { window.dispatchEvent(new CustomEvent('deepseek-proxy-error', { detail: String(e) })); } catch (ev) {}
+        return '';
     }
 };
 
 // --- Gemini Fallback Helper ---
 const callGemini = async (prompt: string | any, model: string = "gemini-2.5-flash", config: any = {}) => {
     const { geminiKey } = getKeys();
-    if (!geminiKey) {
-        // Emit a global event so the UI can react (show settings/toast) instead of hard-crashing
-        try {
-            window.dispatchEvent(new CustomEvent('gemini-key-missing', { detail: 'GEMINI_KEY_MISSING' }));
-        } catch (e) {}
+    const geminiDisabled = sessionStorage.getItem('GEMINI_DISABLED') === '1';
+    if (!geminiKey || geminiDisabled) {
+        // Do not emit a global event when Gemini is simply not configured.
+        // Only emit events in explicit error cases (e.g. leaked/revoked keys).
         throw new Error("GEMINI_KEY_MISSING");
     }
 
@@ -144,6 +173,31 @@ const callGemini = async (prompt: string | any, model: string = "gemini-2.5-flas
         });
         return response;
     } catch (e) {
+        // Detect common API error shapes (ApiError with JSON message) and handle leaked/forbidden keys
+        try {
+            const msg = (e as any)?.message || '';
+            // Some errors embed a JSON string containing { error: { code, message, status } }
+            const jsonMatch = typeof msg === 'string' ? msg.match(/\{\s*"error"[\s\S]*\}/) : null;
+            if (jsonMatch) {
+                try {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    const code = parsed?.error?.code;
+                    const status = parsed?.error?.status || '';
+                    const message = parsed?.error?.message || '';
+                    if (code === 403 || status === 'PERMISSION_DENIED' || /leaked/i.test(message)) {
+                        // Key was rejected by Google — clear local copy and notify the app so it can prompt user
+                        try { setGeminiKey(''); } catch (er) {}
+                        try { window.dispatchEvent(new CustomEvent('gemini-key-missing', { detail: { reason: 'GEMINI_KEY_LEAKED', message } })); } catch (er) {}
+                        // disable Gemini for this session even if env provides a key
+                        try { sessionStorage.setItem('GEMINI_DISABLED', '1'); } catch (er) {}
+                        throw new Error('GEMINI_KEY_LEAKED');
+                    }
+                } catch (pe) {
+                    // ignore parse error and fall through to generic handling
+                }
+            }
+        } catch (inner) {}
+
         console.warn("Gemini call failed", e);
         throw e;
     }
@@ -154,8 +208,8 @@ const callGemini = async (prompt: string | any, model: string = "gemini-2.5-flas
  * Priority: AMap -> Gemini (Google Maps) -> Gemini (Text) -> Mock Data
  */
 export const findNearbyLandmarks = async (coords: Coordinates): Promise<Landmark[]> => {
-  // 1. Try AMap
-  if (hasDomesticKeys()) {
+    // 1. Try AMap (if AMap keys are configured)
+    if (hasAmapKeys()) {
       try {
         const AMap = await loadAMap();
         return new Promise((resolve) => {
@@ -191,11 +245,10 @@ export const findNearbyLandmarks = async (coords: Coordinates): Promise<Landmark
   }
 
   // 2. Fallback to Gemini (skip if no key)
-  try {
+      try {
       const { geminiKey } = getKeys();
       if (!geminiKey) {
-          // Notify UI once and continue to final fallback
-          window.dispatchEvent(new CustomEvent('gemini-key-missing', { detail: 'GEMINI_KEY_MISSING' }));
+          // Gemini not configured: do not attempt fallback to Gemini and do not dispatch events.
       } else {
           const response = await callGemini(
               "Find 5 popular tourist landmarks near this location.",
@@ -239,8 +292,8 @@ export const findNearbyLandmarks = async (coords: Coordinates): Promise<Landmark
  * Returns a list of potential matches.
  */
 export const searchLandmarks = async (query: string): Promise<Landmark[]> => {
-    // 1. Try AMap
-    if (hasDomesticKeys()) {
+        // 1. Try AMap if keys exist (do not require DeepSeek key for AMap search)
+        if (hasAmapKeys()) {
         try {
             const AMap = await loadAMap();
             return new Promise((resolve) => {
@@ -269,17 +322,20 @@ export const searchLandmarks = async (query: string): Promise<Landmark[]> => {
 
     // 2. Gemini Fallback
     try {
-        const textResp = await callGemini(`Search for landmarks matching "${query}". Return JSON array: [{"name":"Name", "description":"Desc", "type":"Type"}]`);
-        const json = textResp.text?.match(/\[.*\]/s)?.[0];
-        if (json) {
-            const list = JSON.parse(json);
-            return list.map((l: any, i: number) => ({
-                id: `gem-search-${i}`,
-                name: l.name,
-                description: l.description,
-                type: l.type,
-                distance: "未知"
-            }));
+        const { geminiKey } = getKeys();
+        if (geminiKey) {
+            const textResp = await callGemini(`Search for landmarks matching "${query}". Return JSON array: [{"name":"Name", "description":"Desc", "type":"Type"}]`);
+            const json = textResp.text?.match(/\[.*\]/s)?.[0];
+            if (json) {
+                const list = JSON.parse(json);
+                return list.map((l: any, i: number) => ({
+                    id: `gem-search-${i}`,
+                    name: l.name,
+                    description: l.description,
+                    type: l.type,
+                    distance: "未知"
+                }));
+            }
         }
     } catch(e) {}
 
@@ -294,8 +350,8 @@ export const searchLandmarks = async (query: string): Promise<Landmark[]> => {
  * Search Location (Single Point for relocation)
  */
 export const searchLocation = async (query: string): Promise<{ coords: Coordinates, address: string } | null> => {
-    // 1. Try AMap
-    if (hasDomesticKeys()) {
+    // 1. Try AMap if keys exist (do not require DeepSeek key for geocoding)
+    if (hasAmapKeys()) {
         try {
             const AMap = await loadAMap();
             return new Promise((resolve) => {
@@ -320,12 +376,15 @@ export const searchLocation = async (query: string): Promise<{ coords: Coordinat
 
     // 2. Gemini
     try {
-        const textResp = await callGemini(`Return the latitude and longitude of "${query}" in JSON format: {"latitude": number, "longitude": number}`);
-        const json = textResp.text?.match(/\{.*\}/s)?.[0];
-        if (json) {
-            const coords = JSON.parse(json);
-            if (coords.latitude && coords.longitude) {
-                return { coords, address: query };
+        const { geminiKey } = getKeys();
+        if (geminiKey) {
+            const textResp = await callGemini(`Return the latitude and longitude of "${query}" in JSON format: {"latitude": number, "longitude": number}`);
+            const json = textResp.text?.match(/\{.*\}/s)?.[0];
+            if (json) {
+                const coords = JSON.parse(json);
+                if (coords.latitude && coords.longitude) {
+                    return { coords, address: query };
+                }
             }
         }
     } catch(e) { console.error(e); }
